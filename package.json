@@ -1,0 +1,9 @@
+{
+  "dependencies": {
+    "bluebird": "^3.7.2",
+    "fs": "^0.0.1-security",
+    "html2plaintext": "^2.1.4",
+    "lodash": "^4.17.21",
+    "request-promise": "^4.2.6"
+  },
+}
