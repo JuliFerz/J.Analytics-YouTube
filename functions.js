@@ -32,46 +32,75 @@ const getUserIdYT = function (video) {
         .then(([item]) => {
             idChannel = _.get(item, 'snippet.channelId') || 'No user found';
             return idChannel
-        })
+        }) // falta catch youtube
         .catch(() => `[⚠️]: Invalid video ID: ${idVideo}`)
-
 }
 
-// getInfoVideo('wVa78g6yZ0g')
-// getUserIdYT('https://www.youtube.com/watch?v=wVa78g6yZ0g&t=57s')
 
-
-const finalResults = []
-const getFirsPageAllVideos = function (channelId) {
-    let maxResults;
-    const order = 'date';
-    const options = {
-        'url': `https://www.googleapis.com/youtube/v3/search?order=${order}&part=snippet,id&key=${API_KEY}&channel_id=${channelId}`,
+const getListVideos = function (
+    order,
+    API_KEY,
+    channelId,
+    maxResults = 5,
+    pageToken = ''
+) {
+    return request.get({
+        'url': `https://www.googleapis.com/youtube/v3/search?order=${order}&part=snippet,id&key=${API_KEY}&channel_id=${channelId}&maxResults=${maxResults}&pageToken=${pageToken}`,
         'method': 'GET',
         'json': true
-    };
-    return request(options).promise()
-        .then(json => {
-            maxResults = json['pageInfo']['totalResults'];
-            options['url'] = options['url'].concat(`&maxResults=${maxResults}`)
-            console.log(options);
+    }).promise()
+}
 
-            /------porTestear------/
-            /* return request(options).promise()
-                .then((json) => {
-                    // finalResults.push(json.items)
-                    // return fs.appendFileSync(filename, `module.exports = ${JSON.stringify(...finalResults)}`)
-                    return fs.appendFileSync(filename, `module.exports = ${JSON.stringify(json.items)}`)
-                }) */
+const pushElementsOnArray = function (arr, obj) {
+    for (const item of arr) { obj.push(item) }
+}
+
+const finalResults = []
+let maxResults;
+const getAllVideos = function (channelId) {
+
+    let nextPageToken;
+    return getListVideos('date', API_KEY, channelId)
+        .tap(json => {
+            maxResults = json['pageInfo']['totalResults'];
         })
-        .catch(err => {
-            let newError = err;
-            if (err.statusCode == 403) {
-                newError = { 'Status': 'Forbidden', 'Code': err['statusCode'], 'Message': err['error']['error']['message'] }
-            }
-            return console.log(newError)
+        .then(() => {
+            return getListVideos('date', API_KEY, channelId, maxResults)
+                .then(json => {
+                    if (maxResults == json['pageInfo']['resultsPerPage'])
+                        return fs.appendFileSync(filename, `module.exports = ${JSON.stringify(json['items'])}`);
+                    else {
+                        pushElementsOnArray(json['items'], finalResults);
+                        // FIX
+                        for (let i = 0; ; i++) {
+                            nextPageToken = _.get(json, 'nextPageToken');
+                            console.log('AAAAAAAAAA', json)
+                            if (nextPageToken) {
+                                console.log('entre en nextPageToken')
+                                getListVideos('date', API_KEY, channelId, maxResults, nextPageToken)
+                                    .then((json) => {
+                                        return console.log('BBBBBBBBBB', json)
+                                    })
+                                break
+                            } else {
+                                console.log('TENGO QUE SALIR')
+                                pushElementsOnArray(json['items'], finalResults);
+                                break;
+                            }
+                        }
+                        return fs.appendFileSync(filename, `module.exports = ${JSON.stringify(finalResults)}`);
+                    }
+                })
+            // FIX
+            /* .catch(err => {
+                let newError = err;
+                if (err.statusCode == 403) {
+                    newError = { 'Status': 'Forbidden', 'Code': err['statusCode'], 'Message': err['error']['error']['message'] }
+                }
+                return console.log(newError)
+            }) */
         })
 }
-// getFirsPageAllVideos('UCial3fJD0pEfK1_FYKDW25g');
 
-module.exports = { getUserIdYT, getInfoVideo };
+
+module.exports = { getUserIdYT, getInfoVideo, getAllVideos };
